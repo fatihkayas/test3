@@ -1,0 +1,44 @@
+name: Deploy - Azure Container Apps
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      - name: Login to ACR (Podman)
+        run: |
+          podman login ${{ secrets.ACR_LOGIN_SERVER }} \
+            -u ${{ secrets.ACR_USERNAME }} \
+            -p ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build & Push image (Podman)
+        run: |
+          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.ACA_APP }}:${{ github.sha }}"
+          podman build -t "$IMAGE" -f ./Dockerfile .
+          podman push "$IMAGE"
+
+      - name: Update Container App image
+        run: |
+          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.ACA_APP }}:${{ github.sha }}"
+          az extension add --name containerapp --upgrade
+          az containerapp update \
+            -g "${{ secrets.AZURE_RG }}" \
+            -n "${{ secrets.ACA_APP }}" \
+            --image "$IMAGE"
