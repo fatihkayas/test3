@@ -1,12 +1,16 @@
-name: Deploy - Azure Container Apps
+name: Provision - Azure Container Apps
 
 on:
-  push:
-    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-  deploy:
+  provision:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -17,28 +21,45 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Install Podman
+      - name: Ensure RG
         run: |
-          sudo apt-get update
-          sudo apt-get install -y podman
+          az group create -n "${{ secrets.AZURE_RG }}" -l "${{ secrets.AZURE_LOCATION }}"
 
-      - name: Login to ACR (Podman)
+      - name: Create ACR if missing
         run: |
-          podman login ${{ secrets.ACR_LOGIN_SERVER }} \
-            -u ${{ secrets.ACR_USERNAME }} \
-            -p ${{ secrets.ACR_PASSWORD }}
+          ACR_NAME="acrtest3${GITHUB_RUN_ID}"
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
 
-      - name: Build & Push image (Podman)
-        run: |
-          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.ACA_APP }}:${{ github.sha }}"
-          podman build -t "$IMAGE" -f ./Dockerfile .
-          podman push "$IMAGE"
+          az acr show -n "$ACR_NAME" -g "${{ secrets.AZURE_RG }}" >/dev/null 2>&1 \
+          || az acr create -n "$ACR_NAME" -g "${{ secrets.AZURE_RG }}" --sku Basic
 
-      - name: Update Container App image
+          ACR_LOGIN_SERVER=$(az acr show -n "$ACR_NAME" -g "${{ secrets.AZURE_RG }}" --query loginServer -o tsv)
+          echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_ENV
+          echo "ACR Login Server: $ACR_LOGIN_SERVER"
+
+      - name: Install Container Apps extension
         run: |
-          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.ACA_APP }}:${{ github.sha }}"
           az extension add --name containerapp --upgrade
-          az containerapp update \
-            -g "${{ secrets.AZURE_RG }}" \
-            -n "${{ secrets.ACA_APP }}" \
-            --image "$IMAGE"
+
+      - name: Create ACA Environment if missing
+        run: |
+          az containerapp env show -g "${{ secrets.AZURE_RG }}" -n "${{ secrets.ACA_ENV }}" >/dev/null 2>&1 \
+          || az containerapp env create -g "${{ secrets.AZURE_RG }}" -n "${{ secrets.ACA_ENV }}" -l "${{ secrets.AZURE_LOCATION }}"
+
+      - name: Create Container App (placeholder image)
+        run: |
+          # Placeholder image: hello-world (public). We'll update image in deploy workflow.
+          az containerapp show -g "${{ secrets.AZURE_RG }}" -n "${{ secrets.ACA_APP }}" >/dev/null 2>&1 \
+          || az containerapp create -g "${{ secrets.AZURE_RG }}" -n "${{ secrets.ACA_APP }}" \
+              --environment "${{ secrets.ACA_ENV }}" \
+              --image "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" \
+              --ingress external --target-port 8080
+
+      - name: Print outputs (save ACR info)
+        run: |
+          echo "ACR_NAME=$ACR_NAME"
+          echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER"
+          echo ""
+          echo "IMPORTANT: Add these as GitHub Secrets:"
+          echo "ACR_NAME = $ACR_NAME"
+          echo "ACR_LOGIN_SERVER = $ACR_LOGIN_SERVER"
