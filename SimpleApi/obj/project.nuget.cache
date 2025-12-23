@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "h9fyTjVcRTA=",
+  "success": true,
+  "projectFilePath": "/Users/fatih.yasar/Desktop/test3/SimpleApi/SimpleApi.csproj",
+  "expectedPackageFiles": [
+    "/Users/fatih.yasar/.nuget/packages/microsoft.aspnetcore.openapi/9.0.1/microsoft.aspnetcore.openapi.9.0.1.nupkg.sha512",
+    "/Users/fatih.yasar/.nuget/packages/microsoft.openapi/1.6.17/microsoft.openapi.1.6.17.nupkg.sha512"
+  ],
+  "logs": []
+}
