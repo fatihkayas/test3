@@ -27,3 +27,12 @@ jobs:
 
       - name: Test
         run: dotnet test ./SimpleApiSolution.sln -c Release --no-build
+      
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install podman
+          
+      - name: Build and Run Podman Container
+        run: |
+          podman build -t test3-api:ci .
