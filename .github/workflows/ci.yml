@@ -11,28 +11,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Kodu çek
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ .NET 9 kur
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          dotnet-version: "9.0.x"
 
+      # 3️⃣ Restore
       - name: Restore
         run: dotnet restore ./SimpleApiSolution.sln
 
+      # 4️⃣ Build
       - name: Build
         run: dotnet build ./SimpleApiSolution.sln -c Release --no-restore
 
+      # 5️⃣ Test
       - name: Test
         run: dotnet test ./SimpleApiSolution.sln -c Release --no-build
-      
+
+      # 6️⃣ Podman kur
       - name: Install Podman
         run: |
           sudo apt-get update
-          sudo apt-get -y install podman
-          
-      - name: Build and Run Podman Container
+          sudo apt-get install -y podman
+
+      # 7️⃣ Debug (Dockerfile gerçekten var mı görelim)
+      - name: Debug files
         run: |
-          podman build -t test3-api:ci .
+          pwd
+          ls -la
+          ls -la Dockerfile
+
+      # 8️⃣ Container image build et
+      - name: Build container image (Podman)
+        run: podman build -t test3-api:ci -f ./Dockerfile .
